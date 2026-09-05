@@ -29,4 +29,4 @@ talkievoca:
   opensearch:
     enabled: ${TALKIEVOCA_OPENSEARCH_ENABLED:true}
     url: ${TALKIEVOCA_OPENSEARCH_URL:http://localhost:9200}
-    index: ${TALKIEVOCA_OPENSEARCH_INDEX:vocabulary}
+    index: ${TALKIEVOCA_OPENSEARCH_INDEX:talkievoca-content-v1}

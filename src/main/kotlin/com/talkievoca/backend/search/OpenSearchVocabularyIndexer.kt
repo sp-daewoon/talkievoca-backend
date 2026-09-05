@@ -124,7 +124,7 @@ class OpenSearchVocabularyIndexer(
     }
 
     private fun index(id: String, entry: Map<String, Any>) =
-        request("PUT", "/$index/_doc/$id", objectMapper.writeValueAsString(entry))
+        request("PUT", "/$index/_doc/$id?refresh=wait_for", objectMapper.writeValueAsString(entry))
 
     private fun status(method: String, path: String): Int =
         client.send(
