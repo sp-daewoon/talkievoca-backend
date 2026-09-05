@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: talkievoca-backend
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/talkievoca}
+    username: ${SPRING_DATASOURCE_USERNAME:talkievoca}
+    password: ${SPRING_DATASOURCE_PASSWORD:talkievoca_dev}
+  flyway:
+    enabled: true
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+  ai:
+    mcp:
+      server:
+        name: talkievoca-backend
+        version: 0.1.0
+        protocol: STATELESS
+        type: SYNC
+
+server:
+  port: ${SERVER_PORT:8080}
+
+talkievoca:
+  opensearch:
+    enabled: ${TALKIEVOCA_OPENSEARCH_ENABLED:true}
+    url: ${TALKIEVOCA_OPENSEARCH_URL:http://localhost:9200}
+    index: ${TALKIEVOCA_OPENSEARCH_INDEX:vocabulary}

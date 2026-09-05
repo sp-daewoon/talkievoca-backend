@@ -1,0 +1,8 @@
+.git
+.gradle
+build
+out
+.idea
+media
+postgres_data
+opensearch_data
