@@ -2,6 +2,7 @@ package com.talkievoca.backend.api
 
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -25,6 +26,9 @@ class ApiErrorHandler {
 
     @ExceptionHandler(MissingServletRequestParameterException::class)
     fun missingWord() = error(HttpStatus.UNPROCESSABLE_CONTENT, "invalid_word", "word must not be blank.")
+
+    @ExceptionHandler(HttpMessageNotReadableException::class)
+    fun invalidBody() = error(HttpStatus.UNPROCESSABLE_CONTENT, "invalid_word", "text is required.")
 
     @ExceptionHandler(InvalidUploadException::class, MissingServletRequestPartException::class)
     fun invalidUpload(exception: Exception) = error(HttpStatus.UNPROCESSABLE_CONTENT, "invalid_upload", exception.message ?: "file is required.")
