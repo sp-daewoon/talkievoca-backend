@@ -1,5 +1,6 @@
 package com.talkievoca.backend.search
 
+import com.talkievoca.backend.vocabulary.WordFeedback
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.ApplicationArguments
@@ -93,6 +94,23 @@ class OpenSearchVocabularyIndexer(
                 )
             )
         }.onFailure { log.warn("OpenSearch knowledge indexing skipped: {}", it.message) }
+    }
+
+    fun indexVocabulary(feedback: WordFeedback) {
+        if (!enabled || !feedback.verified) return
+        runCatching {
+            ensureIndex()
+            index(
+                "vocabulary-${feedback.word}",
+                mapOf(
+                    "kind" to "vocabulary",
+                    "word" to feedback.word,
+                    "meaning_ko" to feedback.meaningKo,
+                    "example_en" to feedback.exampleEn,
+                    "example_ko" to feedback.exampleKo
+                )
+            )
+        }.onFailure { log.warn("OpenSearch vocabulary indexing skipped: {}", it.message) }
     }
 
     fun searchKnowledge(query: String): List<KnowledgeSearchHit> {

@@ -68,3 +68,9 @@ For a physical Apple Watch on the same Wi-Fi, configure the Apple app with the M
 PDF originals and uploaded audio are stored in the Docker `media_data` volume. Their metadata, text, and word connection live in PostgreSQL; extracted PDF chunks are indexed into OpenSearch.
 
 The Apple app uses `POST /v1/assistant/query` for Siri/native dictation and `POST /v1/assistant/audio` for explicit Qwen recording. The older Watch feedback endpoint remains available for compatibility and diagnostics.
+
+## Review Generated Vocabulary
+
+Open [http://localhost:8080/admin/](http://localhost:8080/admin/) on the Mac. The review queue shows SLM-generated `pending` cards. Correct the English headword, Korean meaning, examples, and lookup aliases, then choose **수정 승인**. Approval stores the card as `manual/trusted`, replaces the incorrect aliases, and indexes the corrected card in OpenSearch. **검수에서 제외** removes only pending cards.
+
+The admin surface is intended for the private local MVP network. Add authentication before exposing the backend to the public internet.

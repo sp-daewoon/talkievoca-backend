@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TalkieVoca Admin</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18201c;
+      --muted: #64716a;
+      --line: #d8dedb;
+      --surface: #ffffff;
+      --canvas: #f4f6f5;
+      --accent: #16704a;
+      --accent-hover: #105b3c;
+      --pending-bg: #fff3cc;
+      --pending-ink: #765400;
+      --danger: #a13333;
+      --focus: #176b9d;
+    }
+
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--canvas);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+      letter-spacing: 0;
+    }
+
+    button, input, textarea, select { font: inherit; letter-spacing: 0; }
+
+    button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--focus) 28%, transparent);
+      outline-offset: 1px;
+    }
+
+    .topbar {
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 0 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      background: var(--accent);
+      color: white;
+      font-weight: 750;
+    }
+    .brand strong { font-size: 16px; }
+    .brand span { color: var(--muted); }
+
+    .api-state { display: flex; align-items: center; gap: 7px; color: var(--muted); white-space: nowrap; }
+    .api-dot { width: 8px; height: 8px; border-radius: 50%; background: #b7c0bb; }
+    .api-state.online .api-dot { background: #1a9b61; }
+    .api-state.error .api-dot { background: var(--danger); }
+
+    .workspace {
+      width: min(1180px, 100%);
+      min-height: calc(100vh - 58px);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: minmax(270px, 340px) minmax(0, 1fr);
+      background: var(--surface);
+      border-inline: 1px solid var(--line);
+    }
+
+    .queue { border-right: 1px solid var(--line); min-width: 0; }
+    .section-head {
+      min-height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+    .section-head h1, .section-head h2 { margin: 0; font-size: 15px; }
+    .count {
+      min-width: 27px;
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: var(--pending-bg);
+      color: var(--pending-ink);
+      font-size: 12px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .filters { display: flex; gap: 8px; align-items: center; }
+    select, .secondary-button {
+      height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--ink);
+    }
+    select { padding: 0 30px 0 9px; }
+    .secondary-button { padding: 0 11px; cursor: pointer; }
+    .secondary-button:hover { background: var(--canvas); }
+
+    .queue-list { margin: 0; padding: 0; list-style: none; }
+    .queue-item {
+      width: 100%;
+      min-height: 76px;
+      padding: 13px 16px;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+      text-align: left;
+      cursor: pointer;
+    }
+    .queue-item:hover { background: #f7faf8; }
+    .queue-item.selected { background: #eaf4ef; box-shadow: inset 3px 0 var(--accent); }
+    .queue-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .queue-word { font-size: 16px; font-weight: 720; overflow-wrap: anywhere; }
+    .queue-meaning { display: block; margin-top: 5px; color: var(--muted); overflow-wrap: anywhere; }
+    .badge { padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    .badge.pending { background: var(--pending-bg); color: var(--pending-ink); }
+    .badge.trusted { background: #dcefe5; color: #155c3d; }
+
+    .empty {
+      padding: 52px 20px;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.7;
+    }
+
+    .editor { min-width: 0; }
+    .editor-state { min-height: calc(100vh - 122px); display: grid; place-items: center; color: var(--muted); }
+    .editor-form { display: none; }
+    .editor-form.active { display: block; }
+    .form-body { max-width: 720px; padding: 26px 28px 32px; }
+    .origin-line { margin: 0 0 24px; color: var(--muted); font-size: 12px; }
+    .field { display: grid; gap: 7px; margin-bottom: 18px; }
+    .field label { font-weight: 680; }
+    .field small { color: var(--muted); }
+    input, textarea {
+      width: 100%;
+      border: 1px solid #cbd3cf;
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--ink);
+      padding: 10px 11px;
+    }
+    input { height: 42px; }
+    textarea { min-height: 86px; resize: vertical; line-height: 1.5; }
+    input:focus, textarea:focus { border-color: var(--focus); }
+    .form-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 8px;
+    }
+    .action-group { display: flex; gap: 8px; }
+    .primary-button, .danger-button {
+      min-height: 38px;
+      border-radius: 6px;
+      padding: 0 15px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .primary-button { border: 1px solid var(--accent); background: var(--accent); color: white; }
+    .primary-button:hover { background: var(--accent-hover); }
+    .danger-button { border: 1px solid #d8b7b7; background: white; color: var(--danger); }
+    .danger-button:hover { background: #fff3f3; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .message { min-height: 20px; margin: 14px 28px 0; color: var(--muted); }
+    .message.error { color: var(--danger); }
+    .message.success { color: var(--accent); }
+
+    @media (max-width: 760px) {
+      .topbar { padding: 0 14px; }
+      .brand span { display: none; }
+      .workspace { grid-template-columns: 1fr; border: 0; }
+      .queue { border-right: 0; }
+      .editor { border-top: 8px solid var(--canvas); }
+      .editor-state { min-height: 220px; }
+      .form-body { padding: 20px 16px 26px; }
+      .form-actions { align-items: stretch; flex-direction: column-reverse; }
+      .action-group { width: 100%; }
+      .action-group button { flex: 1; }
+      .message { margin-inline: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">TV</div>
+      <strong>TalkieVoca</strong>
+      <span>Vocabulary Review</span>
+    </div>
+    <div id="apiState" class="api-state" role="status">
+      <span class="api-dot"></span><span>연결 중</span>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="queue" aria-labelledby="queueTitle">
+      <div class="section-head">
+        <div class="filters">
+          <h1 id="queueTitle">검수 목록</h1>
+          <span id="count" class="count">0</span>
+        </div>
+        <div class="filters">
+          <label for="status" class="sr-only">상태</label>
+          <select id="status">
+            <option value="pending">대기</option>
+            <option value="trusted">승인</option>
+            <option value="all">전체</option>
+          </select>
+          <button id="refresh" class="secondary-button" type="button" aria-label="목록 새로고침">새로고침</button>
+        </div>
+      </div>
+      <ul id="queueList" class="queue-list"></ul>
+      <div id="queueEmpty" class="empty" hidden>검수할 단어가 없습니다.</div>
+    </section>
+
+    <section class="editor" aria-labelledby="editorTitle">
+      <div class="section-head">
+        <h2 id="editorTitle">단어 편집</h2>
+      </div>
+      <p id="message" class="message" role="status"></p>
+      <div id="editorState" class="editor-state">왼쪽 목록에서 단어를 선택하세요.</div>
+      <form id="editorForm" class="editor-form">
+        <div class="form-body">
+          <p id="originLine" class="origin-line"></p>
+          <div class="field">
+            <label for="word">영단어</label>
+            <input id="word" name="word" required maxlength="100" autocomplete="off" spellcheck="false">
+          </div>
+          <div class="field">
+            <label for="meaningKo">한국어 뜻</label>
+            <input id="meaningKo" name="meaningKo" required maxlength="200" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="exampleEn">영어 예문</label>
+            <textarea id="exampleEn" name="exampleEn" required maxlength="300" spellcheck="true"></textarea>
+          </div>
+          <div class="field">
+            <label for="exampleKo">한국어 예문</label>
+            <textarea id="exampleKo" name="exampleKo" required maxlength="300"></textarea>
+          </div>
+          <div class="field">
+            <label for="aliases">검색어</label>
+            <textarea id="aliases" name="aliases" maxlength="1000"></textarea>
+            <small>한 줄에 하나씩 입력</small>
+          </div>
+          <div class="form-actions">
+            <button id="reject" class="danger-button" type="button">검수에서 제외</button>
+            <div class="action-group">
+              <button id="reset" class="secondary-button" type="button">되돌리기</button>
+              <button id="save" class="primary-button" type="submit">수정 승인</button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    const state = { items: [], selected: null, busy: false };
+    const elements = {
+      apiState: document.querySelector('#apiState'),
+      status: document.querySelector('#status'),
+      refresh: document.querySelector('#refresh'),
+      count: document.querySelector('#count'),
+      queueList: document.querySelector('#queueList'),
+      queueEmpty: document.querySelector('#queueEmpty'),
+      editorState: document.querySelector('#editorState'),
+      editorForm: document.querySelector('#editorForm'),
+      originLine: document.querySelector('#originLine'),
+      message: document.querySelector('#message'),
+      word: document.querySelector('#word'),
+      meaningKo: document.querySelector('#meaningKo'),
+      exampleEn: document.querySelector('#exampleEn'),
+      exampleKo: document.querySelector('#exampleKo'),
+      aliases: document.querySelector('#aliases'),
+      reject: document.querySelector('#reject'),
+      reset: document.querySelector('#reset'),
+      save: document.querySelector('#save')
+    };
+
+    function setMessage(text = '', type = '') {
+      elements.message.textContent = text;
+      elements.message.className = `message ${type}`.trim();
+    }
+
+    function setBusy(busy) {
+      state.busy = busy;
+      elements.refresh.disabled = busy;
+      elements.reject.disabled = busy;
+      elements.reset.disabled = busy;
+      elements.save.disabled = busy;
+    }
+
+    async function api(path, options = {}) {
+      const response = await fetch(path, {
+        ...options,
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error?.message || `HTTP ${response.status}`);
+      }
+      return response.status === 204 ? null : response.json();
+    }
+
+    async function loadItems(preferredWord) {
+      setBusy(true);
+      setMessage();
+      try {
+        state.items = await api(`/v1/admin/vocabulary?status=${elements.status.value}`);
+        renderQueue();
+        elements.apiState.className = 'api-state online';
+        elements.apiState.lastElementChild.textContent = 'API 연결됨';
+        const next = state.items.find(item => item.word === preferredWord) || state.items[0];
+        selectItem(next || null);
+      } catch (error) {
+        elements.apiState.className = 'api-state error';
+        elements.apiState.lastElementChild.textContent = 'API 연결 오류';
+        setMessage(error.message, 'error');
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    function renderQueue() {
+      elements.queueList.replaceChildren();
+      elements.count.textContent = state.items.length;
+      elements.queueEmpty.hidden = state.items.length > 0;
+      state.items.forEach(item => {
+        const li = document.createElement('li');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `queue-item${state.selected?.word === item.word ? ' selected' : ''}`;
+        button.addEventListener('click', () => selectItem(item));
+
+        const row = document.createElement('span');
+        row.className = 'queue-row';
+        const word = document.createElement('span');
+        word.className = 'queue-word';
+        word.textContent = item.word;
+        const badge = document.createElement('span');
+        badge.className = `badge ${item.verification_status}`;
+        badge.textContent = item.verification_status;
+        row.append(word, badge);
+
+        const meaning = document.createElement('span');
+        meaning.className = 'queue-meaning';
+        meaning.textContent = item.meaning_ko;
+        button.append(row, meaning);
+        li.append(button);
+        elements.queueList.append(li);
+      });
+    }
+
+    function selectItem(item) {
+      state.selected = item;
+      renderQueue();
+      if (!item) {
+        elements.editorForm.classList.remove('active');
+        elements.editorState.hidden = false;
+        return;
+      }
+      elements.editorState.hidden = true;
+      elements.editorForm.classList.add('active');
+      elements.originLine.textContent = `원본: ${item.word} · ${item.origin} · ${item.verification_status}`;
+      elements.word.value = item.word;
+      elements.meaningKo.value = item.meaning_ko;
+      elements.exampleEn.value = item.example_en;
+      elements.exampleKo.value = item.example_ko;
+      elements.aliases.value = item.aliases.filter(alias => alias !== item.word).join('\n');
+      elements.reject.hidden = item.verification_status !== 'pending';
+      setMessage();
+    }
+
+    function correctionBody() {
+      return {
+        original_word: state.selected.word,
+        word: elements.word.value,
+        meaning_ko: elements.meaningKo.value,
+        example_en: elements.exampleEn.value,
+        example_ko: elements.exampleKo.value,
+        aliases: elements.aliases.value.split('\n').map(value => value.trim()).filter(Boolean)
+      };
+    }
+
+    elements.editorForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!state.selected || state.busy) return;
+      setBusy(true);
+      setMessage('저장 중');
+      try {
+        const saved = await api('/v1/admin/vocabulary/corrections', {
+          method: 'POST',
+          body: JSON.stringify(correctionBody())
+        });
+        await loadItems(saved.word);
+        setMessage(`${saved.word} 수정이 승인되었습니다.`, 'success');
+      } catch (error) {
+        setMessage(error.message, 'error');
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    elements.reject.addEventListener('click', async () => {
+      if (!state.selected || state.busy) return;
+      if (!window.confirm(`${state.selected.word} 항목을 검수 목록에서 제외할까요?`)) return;
+      setBusy(true);
+      try {
+        await api(`/v1/admin/vocabulary/${encodeURIComponent(state.selected.word)}`, { method: 'DELETE' });
+        await loadItems();
+      } catch (error) {
+        setMessage(error.message, 'error');
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    elements.reset.addEventListener('click', () => selectItem(state.selected));
+    elements.refresh.addEventListener('click', () => loadItems(state.selected?.word));
+    elements.status.addEventListener('change', () => loadItems());
+    loadItems();
+  </script>
+</body>
+</html>

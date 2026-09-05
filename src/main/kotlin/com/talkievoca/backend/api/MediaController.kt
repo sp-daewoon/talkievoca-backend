@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
+import java.time.Duration
 import java.util.UUID
 
 data class AudioUploadResponse(val mediaId: UUID, val word: String, val audioUrl: String)
@@ -34,6 +35,7 @@ class MediaController(private val audioStorageService: AudioStorageService) {
         val stored = audioStorageService.load(mediaId)
         return ResponseEntity.ok()
             .contentType(MediaType.parseMediaType(stored.contentType))
+            .cacheControl(org.springframework.http.CacheControl.maxAge(Duration.ofDays(7)).cachePublic())
             .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().filename(stored.filename).build().toString())
             .body(stored.resource)
     }
