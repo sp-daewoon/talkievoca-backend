@@ -62,6 +62,30 @@ class AssistantQueryApiTest {
         assertEquals("text is required.", json.path("error").path("message").asString())
     }
 
+    @Test
+    fun `audio endpoint reports unavailable ASR without breaking text requests`() {
+        val boundary = "TalkieVocaTest"
+        val body = "--$boundary\r\n" +
+            "Content-Disposition: form-data; name=\"file\"; filename=\"word.m4a\"\r\n" +
+            "Content-Type: audio/mp4\r\n\r\n" +
+            "audio\r\n" +
+            "--$boundary--\r\n"
+        val response = client.send(
+            HttpRequest.newBuilder(URI.create("http://localhost:$port/v1/assistant/audio"))
+                .header("Content-Type", "multipart/form-data; boundary=$boundary")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build(),
+            HttpResponse.BodyHandlers.ofString()
+        )
+
+        assertEquals(503, response.statusCode())
+        assertEquals(
+            "asr_unavailable",
+            objectMapper.readTree(response.body()).path("error").path("code").asString()
+        )
+        assertEquals(200, post("""{"text":"apple"}""").statusCode())
+    }
+
     private fun post(body: String): HttpResponse<String> = client.send(
         HttpRequest.newBuilder(URI.create("http://localhost:$port/v1/assistant/query"))
             .header("Content-Type", "application/json")

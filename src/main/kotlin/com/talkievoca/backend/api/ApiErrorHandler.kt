@@ -15,6 +15,8 @@ class InvalidWordException(message: String) : RuntimeException(message)
 class WordNotFoundException(word: String) : RuntimeException("No feedback found for '$word'.")
 class InvalidUploadException(message: String) : RuntimeException(message)
 class StoredFileNotFoundException(message: String) : RuntimeException(message)
+class InvalidAudioException(message: String) : RuntimeException(message)
+class AsrUnavailableException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
 
 @RestControllerAdvice
 class ApiErrorHandler {
@@ -35,6 +37,12 @@ class ApiErrorHandler {
 
     @ExceptionHandler(StoredFileNotFoundException::class)
     fun storedFileNotFound(exception: StoredFileNotFoundException) = error(HttpStatus.NOT_FOUND, "media_not_found", exception.message!!)
+
+    @ExceptionHandler(InvalidAudioException::class)
+    fun invalidAudio(exception: InvalidAudioException) = error(HttpStatus.UNPROCESSABLE_CONTENT, "invalid_audio", exception.message!!)
+
+    @ExceptionHandler(AsrUnavailableException::class)
+    fun asrUnavailable(exception: AsrUnavailableException) = error(HttpStatus.SERVICE_UNAVAILABLE, "asr_unavailable", exception.message!!)
 
     private fun error(status: HttpStatus, code: String, message: String) =
         ResponseEntity.status(status).body(ErrorBody(ErrorDetail(code, message)))

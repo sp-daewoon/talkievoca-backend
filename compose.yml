@@ -32,6 +32,21 @@ services:
       timeout: 5s
       retries: 30
 
+  qwen-asr:
+    image: quantatrisk/qwen3-asr:cpu-latest@sha256:63f7f3407a0f635d09f3afd0026b2c42ab7a7e7f878a95200475b6081fd1b2b4
+    entrypoint: ["/opt/venv/bin/python", "/talkievoca/qwen-asr-server.py"]
+    environment:
+      API_KEY: ${TALKIEVOCA_ASR_API_KEY:-}
+      HF_HUB_OFFLINE: ${TALKIEVOCA_ASR_OFFLINE:-0}
+      QWEN3_ASR_MODEL: Qwen/Qwen3-ASR-0.6B
+      MAX_AUDIO_BYTES: 2097152
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - qwen_asr_huggingface:/root/.cache/huggingface
+      - ./docker/qwen-asr-server.py:/talkievoca/qwen-asr-server.py:ro
+    restart: unless-stopped
+
   app:
     build: .
     environment:
@@ -41,17 +56,29 @@ services:
       SPRING_DATASOURCE_PASSWORD: talkievoca_dev
       TALKIEVOCA_OPENSEARCH_URL: http://opensearch:9200
       TALKIEVOCA_STORAGE_DIR: /data
+      TALKIEVOCA_SLM_ENABLED: ${TALKIEVOCA_SLM_ENABLED:-true}
+      TALKIEVOCA_SLM_URL: ${TALKIEVOCA_SLM_URL:-http://host.docker.internal:11434}
+      TALKIEVOCA_SLM_MODEL: ${TALKIEVOCA_SLM_MODEL:-qwen3:4b}
+      TALKIEVOCA_ASR_ENABLED: ${TALKIEVOCA_ASR_ENABLED:-true}
+      TALKIEVOCA_ASR_URL: ${TALKIEVOCA_ASR_URL:-http://qwen-asr:8000}
+      TALKIEVOCA_ASR_MODEL: ${TALKIEVOCA_ASR_MODEL:-qwen3-asr-0.6b}
+      TALKIEVOCA_ASR_API_KEY: ${TALKIEVOCA_ASR_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
       opensearch:
         condition: service_healthy
+      qwen-asr:
+        condition: service_started
     ports:
       - "8080:8080"
     volumes:
       - media_data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   postgres_data:
   opensearch_data:
   media_data:
+  qwen_asr_huggingface:

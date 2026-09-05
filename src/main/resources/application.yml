@@ -30,3 +30,15 @@ talkievoca:
     enabled: ${TALKIEVOCA_OPENSEARCH_ENABLED:true}
     url: ${TALKIEVOCA_OPENSEARCH_URL:http://localhost:9200}
     index: ${TALKIEVOCA_OPENSEARCH_INDEX:talkievoca-content-v1}
+  asr:
+    enabled: ${TALKIEVOCA_ASR_ENABLED:false}
+    url: ${TALKIEVOCA_ASR_URL:http://localhost:8000}
+    model: ${TALKIEVOCA_ASR_MODEL:Qwen/Qwen3-ASR-0.6B}
+    api-key: ${TALKIEVOCA_ASR_API_KEY:}
+    timeout-seconds: ${TALKIEVOCA_ASR_TIMEOUT_SECONDS:20}
+    max-bytes: ${TALKIEVOCA_ASR_MAX_BYTES:2097152}
+  slm:
+    enabled: ${TALKIEVOCA_SLM_ENABLED:false}
+    url: ${TALKIEVOCA_SLM_URL:http://localhost:11434}
+    model: ${TALKIEVOCA_SLM_MODEL:qwen3:4b}
+    timeout-seconds: ${TALKIEVOCA_SLM_TIMEOUT_SECONDS:12}

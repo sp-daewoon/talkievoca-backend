@@ -37,7 +37,11 @@ class OpenSearchVocabularyIndexer(
         runCatching {
             ensureIndex()
             jdbc.query(
-                "select word, meaning_ko, example_en, example_ko from vocabulary_entries"
+                """
+                select word, meaning_ko, example_en, example_ko
+                from vocabulary_entries
+                where verification_status = 'trusted'
+                """.trimIndent()
             ) { resultSet, _ ->
                 mapOf(
                     "kind" to "vocabulary",
@@ -111,13 +115,13 @@ class OpenSearchVocabularyIndexer(
             val iterator = nodes.iterator()
             while (iterator.hasNext()) {
                 val hit = iterator.next()
-                    val source = hit.path("_source")
+                val source = hit.path("_source")
                 hits += KnowledgeSearchHit(
-                        sourceId = UUID.fromString(source.path("source_id").asText()),
-                        title = source.path("title").asText(),
-                        content = source.path("content").asText(),
-                        score = hit.path("_score").asDouble()
-                    )
+                    sourceId = UUID.fromString(source.path("source_id").asString()),
+                    title = source.path("title").asString(),
+                    content = source.path("content").asString(),
+                    score = hit.path("_score").asDouble()
+                )
             }
             hits
         }.onFailure { log.warn("OpenSearch knowledge search skipped: {}", it.message) }.getOrDefault(emptyList())
