@@ -40,6 +40,7 @@ services:
       SPRING_DATASOURCE_USERNAME: talkievoca
       SPRING_DATASOURCE_PASSWORD: talkievoca_dev
       TALKIEVOCA_OPENSEARCH_URL: http://opensearch:9200
+      TALKIEVOCA_STORAGE_DIR: /data
     depends_on:
       postgres:
         condition: service_healthy
@@ -47,7 +48,10 @@ services:
         condition: service_healthy
     ports:
       - "8080:8080"
+    volumes:
+      - media_data:/data
 
 volumes:
   postgres_data:
   opensearch_data:
+  media_data:

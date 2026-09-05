@@ -5,6 +5,5 @@ out/
 .idea/
 *.iml
 .env
-media/
 postgres_data/
 opensearch_data/

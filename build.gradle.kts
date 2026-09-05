@@ -28,6 +28,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation("org.springframework.ai:spring-ai-starter-mcp-server-webmvc")
     implementation("org.flywaydb:flyway-database-postgresql")
+    implementation("org.apache.pdfbox:pdfbox:3.0.5")
     runtimeOnly("org.postgresql:postgresql")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
