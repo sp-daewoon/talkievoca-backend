@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.jdbc.core.JdbcTemplate
+import java.util.UUID
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -35,6 +37,9 @@ class VocabularyAdminApiTest {
     @Autowired
     private lateinit var objectMapper: ObjectMapper
 
+    @Autowired
+    private lateinit var jdbc: JdbcTemplate
+
     private val client = HttpClient.newHttpClient()
 
     @Test
@@ -43,6 +48,9 @@ class VocabularyAdminApiTest {
             "오징어",
             GeneratedVocabulary("octopus", "오징어", "An octopus has eight arms.", "문어는 팔이 여덟 개다.")
         )
+        val sourceId = UUID.randomUUID()
+        jdbc.update("insert into knowledge_sources (id, title, original_filename, content_type, storage_path, extracted_text) values (?, 'Lesson', 'lesson.pdf', 'application/pdf', 'fixture.pdf', 'octopus')", sourceId)
+        jdbc.update("insert into vocabulary_sources (word, source_id) values ('octopus', ?)", sourceId)
 
         val pending = get("/v1/admin/vocabulary?status=pending")
         assertEquals(200, pending.statusCode())
@@ -56,7 +64,8 @@ class VocabularyAdminApiTest {
                 "meaning_ko":"오징어",
                 "example_en":"The squid swims through the sea.",
                 "example_ko":"그 오징어는 바다를 헤엄쳐 다닌다.",
-                "aliases":["오징어"]
+                "aliases":["오징어"],
+                "questions":["오징어를 영어로 뭐라고 해?"]
             }""".trimIndent()
         )
 
@@ -65,8 +74,23 @@ class VocabularyAdminApiTest {
         assertEquals("squid", saved.path("word").asString())
         assertEquals("trusted", saved.path("verification_status").asString())
         assertEquals("manual", saved.path("origin").asString())
+        assertEquals("오징어를 영어로 뭐라고 해?", saved.path("questions")[0].asString())
         assertEquals("squid", vocabulary.feedbackFor("오징어").word)
+        assertEquals(sourceId, jdbc.queryForObject("select source_id from vocabulary_sources where word = 'squid'", UUID::class.java))
         assertFalse(vocabulary.reviewItems("pending").any { it.word == "octopus" })
+    }
+
+    @Test
+    fun `operator creates a new card before attaching pronunciation`() {
+        val response = post("/v1/admin/vocabulary/corrections", """{
+            "original_word":"", "word":"lamp", "meaning_ko":"등", "example_en":"The lamp is on.",
+            "example_ko":"등이 켜져 있다.", "aliases":["등"], "questions":["등을 영어로 뭐라고 해?"]
+        }""")
+        assertEquals(200, response.statusCode())
+        assertEquals("lamp", vocabulary.feedbackFor("등").word)
+        assertEquals(422, post("/v1/admin/vocabulary/corrections", """{
+            "original_word":"", "word":"lamp", "meaning_ko":"다른 뜻", "example_en":"The lamp is on.","example_ko":"등이 켜져 있다."
+        }""").statusCode())
     }
 
     @Test

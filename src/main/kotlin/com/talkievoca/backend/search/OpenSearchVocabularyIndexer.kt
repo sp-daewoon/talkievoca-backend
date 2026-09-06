@@ -28,7 +28,8 @@ class OpenSearchVocabularyIndexer(
     @param:Value("\${talkievoca.opensearch.url}") private val baseUrl: String,
     @param:Value("\${talkievoca.opensearch.index}") private val index: String,
     private val jdbc: JdbcTemplate,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val meanings: MeaningSearchService
 ) : ApplicationRunner {
     private val log = LoggerFactory.getLogger(javaClass)
     private val client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build()
@@ -68,6 +69,8 @@ class OpenSearchVocabularyIndexer(
             }.forEach(::indexKnowledgeChunk)
             log.info("OpenSearch vocabulary index is ready: {}", index)
         }.onFailure { log.warn("OpenSearch indexing skipped: {}", it.message) }
+        val rebuilt = meanings.rebuild()
+        log.info("Meaning embeddings indexed={}, failed={}", rebuilt.indexed, rebuilt.failed)
     }
 
     private fun ensureIndex() {
@@ -94,6 +97,7 @@ class OpenSearchVocabularyIndexer(
                 )
             )
         }.onFailure { log.warn("OpenSearch knowledge indexing skipped: {}", it.message) }
+        meanings.indexChunk(chunk.id)
     }
 
     fun indexVocabulary(feedback: WordFeedback) {
@@ -111,6 +115,7 @@ class OpenSearchVocabularyIndexer(
                 )
             )
         }.onFailure { log.warn("OpenSearch vocabulary indexing skipped: {}", it.message) }
+        meanings.indexVocabulary(feedback.word)
     }
 
     fun searchKnowledge(query: String): List<KnowledgeSearchHit> {

@@ -93,6 +93,7 @@
     }
 
     .queue { border-right: 1px solid var(--line); min-width: 0; }
+    .queue .section-head { flex-wrap:wrap; }
     .section-head {
       min-height: 64px;
       display: flex;
@@ -196,8 +197,27 @@
     .message { min-height: 20px; margin: 14px 28px 0; color: var(--muted); }
     .message.error { color: var(--danger); }
     .message.success { color: var(--accent); }
+    .tabs { display:flex; gap:8px; padding:12px 24px; border-bottom:1px solid var(--line); background:white; }
+    .tabs button { padding:8px 14px; border:0; border-bottom:2px solid transparent; background:white; cursor:pointer; }
+    .tabs button[aria-selected="true"] { border-color:var(--accent); color:var(--accent); font-weight:700; }
+    .operations { max-width:1180px; margin:auto; padding:24px; background:white; }
+    .operations h2 { font-size:18px; margin:0 0 20px; }
+    .upload-grid { display:grid; grid-template-columns:1fr 1fr; gap:32px; }
+    .upload-grid form { min-width:0; }
+    .operations section { padding:24px 0; border-bottom:1px solid var(--line); }
+    .operations select { width:100%; height:42px; }
+    .operations input[type="file"] { height:auto; }
+    .operation-status { white-space:pre-wrap; overflow-wrap:anywhere; color:var(--muted); min-height:20px; }
+    .operation-status.error { color:var(--danger); }
+    .source-row { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:14px 0; border-bottom:1px solid var(--line); }
+    .source-row span { min-width:0; overflow-wrap:anywhere; }
+    .source-row button { flex-shrink:0; white-space:nowrap; }
+    #searchResults li { margin:16px 0; white-space:pre-wrap; overflow-wrap:anywhere; }
+    audio { width:100%; margin-top:12px; }
 
     @media (max-width: 760px) {
+      .upload-grid { grid-template-columns:1fr; }
+      .operations { padding:16px; }
       .topbar { padding: 0 14px; }
       .brand span { display: none; }
       .workspace { grid-template-columns: 1fr; border: 0; }
@@ -224,11 +244,17 @@
     </div>
   </header>
 
-  <main class="workspace">
+  <nav class="tabs" role="tablist" aria-label="관리 업무">
+    <button role="tab" aria-selected="true" aria-controls="reviewPanel" id="reviewTab">단어 검수</button>
+    <button role="tab" aria-selected="false" aria-controls="contentPanel" id="contentTab">자료 · 음원</button>
+  </nav>
+
+  <main class="workspace" id="reviewPanel" role="tabpanel" aria-labelledby="reviewTab">
     <section class="queue" aria-labelledby="queueTitle">
       <div class="section-head">
         <div class="filters">
           <h1 id="queueTitle">검수 목록</h1>
+          <button id="newWord" class="secondary-button" type="button">새 단어</button>
           <span id="count" class="count">0</span>
         </div>
         <div class="filters">
@@ -275,6 +301,10 @@
             <textarea id="aliases" name="aliases" maxlength="1000"></textarea>
             <small>한 줄에 하나씩 입력</small>
           </div>
+            <div class="field">
+              <label for="questions">의미로 찾을 질문 표현</label>
+              <textarea id="questions" maxlength="6000" placeholder="오징어를 영어로 뭐라고 해?"></textarea>
+            </div>
           <div class="form-actions">
             <button id="reject" class="danger-button" type="button">검수에서 제외</button>
             <div class="action-group">
@@ -284,6 +314,46 @@
           </div>
         </div>
       </form>
+    </section>
+  </main>
+
+  <main id="contentPanel" class="operations" role="tabpanel" aria-labelledby="contentTab" hidden>
+    <div class="upload-grid">
+      <section>
+        <h2>PDF 자료 등록</h2>
+        <form id="pdfForm">
+          <div class="field"><label for="pdfTitle">자료명</label><input id="pdfTitle" maxlength="200"></div>
+          <div class="field"><label for="pdfFile">PDF 파일</label><input id="pdfFile" type="file" accept=".pdf,application/pdf" required></div>
+          <button class="primary-button" type="submit">PDF 업로드</button>
+          <p id="pdfStatus" class="operation-status" role="status"></p>
+        </form>
+      </section>
+      <section>
+        <h2>단어 발음 등록</h2>
+        <form id="audioForm">
+          <div class="field"><label for="audioWord">연결할 단어</label><select id="audioWord" required><option value="">단어 선택</option></select></div>
+          <div class="field"><label for="audioFile">MP3 · M4A · WAV · AAC</label><input id="audioFile" type="file" accept=".mp3,.m4a,.wav,.aac,audio/*" required></div>
+          <button class="primary-button" type="submit">음원 연결</button>
+          <p id="audioStatus" class="operation-status" role="status"></p>
+          <audio id="audioPreview" controls preload="none" hidden></audio>
+        </form>
+      </section>
+    </div>
+    <section>
+      <h2>등록된 PDF</h2>
+      <p>단어 추출: 자료 앞 12,000자 · 최대 20개 · 검수 대기로 등록</p>
+      <div id="sourceList"></div>
+      <p id="extractionStatus" class="operation-status" role="status"></p>
+    </section>
+    <section>
+      <h2>의미 검색 확인</h2>
+      <form id="searchForm">
+        <div class="field"><label for="meaningQuery">질문</label><input id="meaningQuery" maxlength="300" required placeholder="오징어의 영어 표현을 알려줘"></div>
+        <button class="primary-button" type="submit">검색</button>
+        <button class="secondary-button" id="reindex" type="button">임베딩 다시 생성</button>
+      </form>
+      <p id="searchStatus" class="operation-status" role="status"></p>
+      <ol id="searchResults"></ol>
     </section>
   </main>
 
@@ -305,6 +375,7 @@
       exampleEn: document.querySelector('#exampleEn'),
       exampleKo: document.querySelector('#exampleKo'),
       aliases: document.querySelector('#aliases'),
+      questions: document.querySelector('#questions'),
       reject: document.querySelector('#reject'),
       reset: document.querySelector('#reset'),
       save: document.querySelector('#save')
@@ -326,7 +397,7 @@
     async function api(path, options = {}) {
       const response = await fetch(path, {
         ...options,
-        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
+        headers: { ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...(options.headers || {}) }
       });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
@@ -400,7 +471,8 @@
       elements.exampleEn.value = item.example_en;
       elements.exampleKo.value = item.example_ko;
       elements.aliases.value = item.aliases.filter(alias => alias !== item.word).join('\n');
-      elements.reject.hidden = item.verification_status !== 'pending';
+      elements.questions.value = (item.questions || []).join('\n');
+      elements.reject.hidden = item.verification_status !== 'pending' || !item.word;
       setMessage();
     }
 
@@ -411,7 +483,8 @@
         meaning_ko: elements.meaningKo.value,
         example_en: elements.exampleEn.value,
         example_ko: elements.exampleKo.value,
-        aliases: elements.aliases.value.split('\n').map(value => value.trim()).filter(Boolean)
+        aliases: elements.aliases.value.split('\n').map(value => value.trim()).filter(Boolean),
+        questions: elements.questions.value.split('\n').map(value => value.trim()).filter(Boolean)
       };
     }
 
@@ -451,6 +524,96 @@
     elements.reset.addEventListener('click', () => selectItem(state.selected));
     elements.refresh.addEventListener('click', () => loadItems(state.selected?.word));
     elements.status.addEventListener('change', () => loadItems());
+    document.querySelector('#newWord').addEventListener('click', () => {
+      selectItem({word:'',meaning_ko:'',example_en:'',example_ko:'',aliases:[],questions:[],origin:'manual',verification_status:'new'});
+      elements.word.focus();
+    });
+    const byId = id => document.getElementById(id);
+    function operationMessage(id, text, error=false) {
+      byId(id).textContent = text;
+      byId(id).className = `operation-status${error ? ' error' : ''}`;
+    }
+    function activateTab(content) {
+      byId('reviewPanel').hidden = content;
+      byId('contentPanel').hidden = !content;
+      byId('reviewTab').setAttribute('aria-selected', String(!content));
+      byId('contentTab').setAttribute('aria-selected', String(content));
+      if(content) loadContent(); else loadItems();
+    }
+    byId('reviewTab').addEventListener('click', () => activateTab(false));
+    byId('contentTab').addEventListener('click', () => activateTab(true));
+    async function loadContent() {
+      try {
+        const words = await api('/v1/admin/vocabulary?status=all');
+        const select = byId('audioWord');
+        const selected = select.value;
+        select.replaceChildren(new Option('단어 선택', ''));
+        words.sort((a,b) => a.word.localeCompare(b.word)).forEach(word => select.add(new Option(`${word.word} · ${word.meaning_ko}`, word.word)));
+        select.value = selected;
+        const sources = await api('/v1/knowledge/sources');
+        byId('sourceList').replaceChildren();
+        if(!sources.length) byId('sourceList').textContent = '등록된 PDF가 없습니다.';
+        sources.forEach(source => {
+          const row = document.createElement('div'); row.className='source-row';
+          const label = document.createElement('span'); label.textContent=`${source.title} · ${source.chunks}개 본문 조각`;
+          const button = document.createElement('button'); button.className='secondary-button'; button.textContent='단어 추출';
+          button.addEventListener('click', async () => {
+            button.disabled=true;
+            operationMessage('extractionStatus', `${source.title}: 단어 추출 중`);
+            try {
+              const result=await api(`/v1/knowledge/${source.source_id}/vocabulary`,{method:'POST'});
+              operationMessage('extractionStatus', `${result.words.length}개 단어 취합: ${result.words.join(', ') || '없음'}${result.truncated ? '\n앞 12,000자만 분석했습니다.' : ''}\n기존 단어는 보존하고 신규 단어는 검수 대기로 등록했습니다.`);
+              await loadContent();
+            } catch(error) { operationMessage('extractionStatus',error.message,true); }
+            finally { button.disabled=false; }
+          });
+          row.append(label,button); byId('sourceList').append(row);
+        });
+      } catch(error) { operationMessage('pdfStatus',error.message,true); }
+    }
+    byId('pdfForm').addEventListener('submit',async event => {
+      event.preventDefault(); const button=event.target.querySelector('button'); button.disabled=true;
+      operationMessage('pdfStatus','PDF 저장 및 검색 등록 중');
+      try {
+        const body=new FormData(); body.append('file',byId('pdfFile').files[0]); body.append('title',byId('pdfTitle').value);
+        const result=await api('/v1/knowledge/pdf',{method:'POST',body});
+        operationMessage('pdfStatus',`${result.title}: ${result.chunks}개 본문 조각 저장 완료. 아래 목록에서 단어를 추출할 수 있습니다.`);
+        event.target.reset(); await loadContent();
+      } catch(error) { operationMessage('pdfStatus',error.message,true); }
+      finally {button.disabled=false;}
+    });
+    byId('audioForm').addEventListener('submit',async event => {
+      event.preventDefault(); const button=event.target.querySelector('button'); button.disabled=true;
+      operationMessage('audioStatus','음원 업로드 중');
+      try {
+        const body=new FormData(); body.append('file',byId('audioFile').files[0]); body.append('word',byId('audioWord').value);
+        const result=await api('/v1/media/audio',{method:'POST',body});
+        operationMessage('audioStatus',`${result.word} 발음 연결 완료`);
+        byId('audioPreview').src=result.audio_url; byId('audioPreview').hidden=false;
+      } catch(error) { operationMessage('audioStatus',error.message,true); }
+      finally {button.disabled=false;}
+    });
+    byId('searchForm').addEventListener('submit',async event => {
+      event.preventDefault(); const button=event.target.querySelector('button'); button.disabled=true;
+      operationMessage('searchStatus','의미 검색 중'); byId('searchResults').replaceChildren();
+      try {
+        const results=await api(`/v1/admin/vocabulary/search?q=${encodeURIComponent(byId('meaningQuery').value)}`);
+        operationMessage('searchStatus',`${results.length}개 후보 · 유사도는 정답 확률이 아닙니다.`);
+        results.forEach(result => {
+          const li=document.createElement('li'); li.textContent=`${result.word || 'PDF 본문'} · ${result.similarity.toFixed(3)}\n${result.content}`;
+          byId('searchResults').append(li);
+        });
+      } catch(error) { operationMessage('searchStatus',error.message,true); }
+      finally {button.disabled=false;}
+    });
+    byId('reindex').addEventListener('click',async event => {
+      event.target.disabled=true; operationMessage('searchStatus','임베딩 생성 중');
+      try {
+        const result=await api('/v1/admin/vocabulary/reindex',{method:'POST'});
+        operationMessage('searchStatus',`${result.model}: ${result.indexed}개 성공 · ${result.failed}개 실패`,result.failed>0);
+      } catch(error) { operationMessage('searchStatus',error.message,true); }
+      finally {event.target.disabled=false;}
+    });
     loadItems();
   </script>
 </body>

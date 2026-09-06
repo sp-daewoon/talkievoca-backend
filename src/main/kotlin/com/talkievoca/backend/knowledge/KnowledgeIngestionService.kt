@@ -21,6 +21,8 @@ data class PdfIngestResponse(
     val chunks: Int
 )
 
+data class KnowledgeSourceSummary(val sourceId: UUID, val title: String, val filename: String, val chunks: Int)
+
 @Service
 class KnowledgeIngestionService(
     private val jdbc: JdbcTemplate,
@@ -34,7 +36,7 @@ class KnowledgeIngestionService(
         val text = runCatching {
             Loader.loadPDF(bytes).use { PDFTextStripper().getText(it) }
         }.getOrElse { throw InvalidUploadException("PDF text could not be extracted.") }
-            .replace(Regex("\\s+"), " ").trim()
+            .replace(Regex("[\\t ]+"), " ").trim()
         if (text.isBlank()) throw InvalidUploadException("PDF contains no extractable text.")
 
         val sourceId = UUID.randomUUID()
@@ -76,7 +78,32 @@ class KnowledgeIngestionService(
         }
     }
 
-    private fun chunks(text: String): List<String> = text.chunked(1_000)
+    fun sources(): List<KnowledgeSourceSummary> = jdbc.query(
+        """select s.id, s.title, s.original_filename, count(c.id) as chunks from knowledge_sources s
+            left join knowledge_chunks c on c.source_id = s.id
+            group by s.id, s.title, s.original_filename order by s.title""",
+        { rs, _ -> KnowledgeSourceSummary(rs.getObject("id", UUID::class.java), rs.getString("title"), rs.getString("original_filename"), rs.getInt("chunks")) }
+    )
+
+    private fun chunks(text: String): List<String> = chunkText(text)
+
+    companion object {
+        fun chunkText(text: String): List<String> {
+            val chunks = mutableListOf<String>()
+            var start = 0
+            while (start < text.length) {
+                var end = minOf(start + 1600, text.length)
+                if (end < text.length) {
+                    val boundary = text.lastIndexOf('\n', end - 1)
+                    if (boundary > start + 800) end = boundary + 1
+                }
+                chunks += text.substring(start, end).trim()
+                if (end == text.length) break
+                start = end - 200
+            }
+            return chunks.filter(String::isNotBlank)
+        }
+    }
 
     private fun write(relativePath: String, bytes: ByteArray) {
         val target = Path.of(storageDir).resolve(relativePath)

@@ -25,6 +25,9 @@ server:
   port: ${SERVER_PORT:8080}
 
 talkievoca:
+  embedding:
+    enabled: ${TALKIEVOCA_EMBEDDING_ENABLED:false}
+    url: ${TALKIEVOCA_EMBEDDING_URL:http://localhost:11434}
   storage-dir: ${TALKIEVOCA_STORAGE_DIR:/tmp/talkievoca}
   opensearch:
     enabled: ${TALKIEVOCA_OPENSEARCH_ENABLED:true}

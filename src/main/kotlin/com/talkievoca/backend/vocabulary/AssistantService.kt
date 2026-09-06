@@ -3,6 +3,7 @@ package com.talkievoca.backend.vocabulary
 import com.talkievoca.backend.api.InvalidWordException
 import com.talkievoca.backend.api.WordNotFoundException
 import com.talkievoca.backend.search.OpenSearchVocabularyIndexer
+import com.talkievoca.backend.search.MeaningSearchService
 import com.talkievoca.backend.slm.OllamaVocabularyClient
 import org.springframework.stereotype.Service
 
@@ -12,7 +13,8 @@ data class AssistantResolution(val feedback: WordFeedback, val matchedBy: String
 class AssistantService(
     private val vocabulary: VocabularyService,
     private val search: OpenSearchVocabularyIndexer,
-    private val slm: OllamaVocabularyClient
+    private val slm: OllamaVocabularyClient,
+    private val meanings: MeaningSearchService
 ) {
     fun slmStatus() = slm.status()
 
@@ -30,9 +32,12 @@ class AssistantService(
             return AssistantResolution(feedback, match)
         }
 
-        val references = search.searchKnowledge(query)
+        val semantic = meanings.search(query).map { hit ->
+            "${hit.word?.let { "Reviewed English answer: $it. " } ?: "PDF reference: "}${hit.content}"
+        }
+        val references = (semantic + search.searchKnowledge(query)
             .take(3)
-            .map { "${it.title}: ${it.content}" }
+            .map { "${it.title}: ${it.content}" }).distinct().take(5)
         val generated = slm.generate(query, references) ?: throw WordNotFoundException(rawQuery.trim())
         return AssistantResolution(vocabulary.saveGenerated(query, generated), "slm")
     }

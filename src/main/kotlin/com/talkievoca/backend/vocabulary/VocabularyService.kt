@@ -2,11 +2,11 @@ package com.talkievoca.backend.vocabulary
 
 import com.talkievoca.backend.api.InvalidWordException
 import com.talkievoca.backend.api.WordNotFoundException
-import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.OffsetDateTime
+import java.util.UUID
 
 data class WordFeedback(
     val word: String,
@@ -33,7 +33,8 @@ data class VocabularyReviewItem(
     val aliases: List<String>,
     val origin: String,
     val verificationStatus: String,
-    val createdAt: OffsetDateTime
+    val createdAt: OffsetDateTime,
+    val questions: List<String> = emptyList()
 )
 
 data class VocabularyCorrection(
@@ -42,7 +43,8 @@ data class VocabularyCorrection(
     val meaningKo: String,
     val exampleEn: String,
     val exampleKo: String,
-    val aliases: List<String> = emptyList()
+    val aliases: List<String> = emptyList(),
+    val questions: List<String>? = null
 )
 
 @Service
@@ -70,24 +72,21 @@ class VocabularyService(private val jdbc: JdbcTemplate) {
             "SLM returned incomplete vocabulary data."
         }
 
-        val inserted = try {
-            jdbc.update(
+        val inserted = jdbc.update(
                 """
                 insert into vocabulary_entries
                     (word, meaning_ko, example_en, example_ko, audio_path, origin, verification_status)
                 values (?, ?, ?, ?, null, 'slm', 'pending')
+                on conflict do nothing
                 """.trimIndent(),
                 word,
                 generated.meaningKo.take(200),
                 generated.exampleEn.take(300),
                 generated.exampleKo.take(300)
             )
-        } catch (_: DuplicateKeyException) {
-            0
-        }
         if (inserted == 1) {
             listOf(word, normalize(rawQuery)).filter { it.isNotBlank() }.distinct().forEach { alias ->
-                ignoreDuplicate { jdbc.update("insert into vocabulary_aliases (alias, word) values (?, ?)", alias, word) }
+                jdbc.update("insert into vocabulary_aliases (alias, word) values (?, ?) on conflict do nothing", alias, word)
             }
         }
         return requireNotNull(findFeedback(word))
@@ -123,16 +122,30 @@ class VocabularyService(private val jdbc: JdbcTemplate) {
     fun correct(correction: VocabularyCorrection): VocabularyReviewItem {
         val originalWord = normalize(correction.originalWord)
         val word = normalize(correction.word)
-        validateEnglishWord(originalWord, "original_word")
+        if (originalWord.isNotBlank()) validateEnglishWord(originalWord, "original_word")
         validateEnglishWord(word, "word")
         validateText(correction.meaningKo, "meaning_ko", 200)
         validateText(correction.exampleEn, "example_en", 300)
         validateText(correction.exampleKo, "example_ko", 300)
+        val questions = correction.questions?.map(String::trim)?.distinct()
+        if (questions != null) {
+            if (questions.size > 20) throw InvalidWordException("At most 20 questions are allowed.")
+            questions.forEach { validateText(it, "question", 300) }
+        }
 
-        val original = exactFeedback(originalWord) ?: throw WordNotFoundException(originalWord)
-        if (originalWord != word && original.audioUrl != null) {
+        val original = if (originalWord.isBlank()) null else exactFeedback(originalWord) ?: throw WordNotFoundException(originalWord)
+        if (originalWord != word && original?.audioUrl != null) {
             throw InvalidWordException("A word with pronunciation audio cannot be renamed.")
         }
+        if (originalWord != word && exactFeedback(word) != null) {
+            throw InvalidWordException("The target word already exists. Edit that card separately.")
+        }
+        val savedQuestions = questions ?: jdbc.queryForList(
+            "select question from vocabulary_questions where word = ? order by question", String::class.java, originalWord
+        )
+        val sourceIds = jdbc.queryForList(
+            "select source_id from vocabulary_sources where word = ?", UUID::class.java, originalWord
+        )
         val aliases = (correction.aliases + word)
             .map(::normalize)
             .filter(String::isNotBlank)
@@ -150,7 +163,7 @@ class VocabularyService(private val jdbc: JdbcTemplate) {
             }
         }
 
-        if (originalWord != word) {
+        if (originalWord.isNotBlank() && originalWord != word) {
             jdbc.update("delete from vocabulary_entries where word = ?", originalWord)
         }
         val updated = jdbc.update(
@@ -182,6 +195,13 @@ class VocabularyService(private val jdbc: JdbcTemplate) {
         aliases.forEach { alias ->
             jdbc.update("delete from vocabulary_aliases where alias = ?", alias)
             jdbc.update("insert into vocabulary_aliases (alias, word) values (?, ?)", alias, word)
+        }
+        jdbc.update("delete from vocabulary_questions where word = ?", word)
+        savedQuestions.forEach { question ->
+            jdbc.update("insert into vocabulary_questions (word, question) values (?, ?)", word, question)
+        }
+        sourceIds.forEach { sourceId ->
+            jdbc.update("insert into vocabulary_sources (word, source_id) values (?, ?) on conflict do nothing", word, sourceId)
         }
         return requireNotNull(reviewItemFor(word))
     }
@@ -264,7 +284,10 @@ class VocabularyService(private val jdbc: JdbcTemplate) {
         ),
         origin = origin,
         verificationStatus = verificationStatus,
-        createdAt = createdAt
+        createdAt = createdAt,
+        questions = jdbc.queryForList(
+            "select question from vocabulary_questions where word = ? order by question", String::class.java, word
+        )
     )
 
     private fun validateEnglishWord(value: String, field: String) {
@@ -277,14 +300,6 @@ class VocabularyService(private val jdbc: JdbcTemplate) {
         if (value.isBlank()) throw InvalidWordException("$field must not be blank.")
         if (value.length > maxLength) {
             throw InvalidWordException("$field must be $maxLength characters or fewer.")
-        }
-    }
-
-    private fun ignoreDuplicate(block: () -> Unit) {
-        try {
-            block()
-        } catch (_: DuplicateKeyException) {
-            // A concurrent request already cached the same word or alias.
         }
     }
 
